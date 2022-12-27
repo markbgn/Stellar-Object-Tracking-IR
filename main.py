@@ -1,12 +1,13 @@
 import cv2
 import numpy as np
 
-observerMode = False # If observableMode is set to True, relevant results are displayed with pictures.
-showMatchingResult = False
+TRESHHOLD = 0.85  # Treshold for object location. Any smaller match is rejected.
+LENVIEW = 100  # Camera lens' angle of view in degrees
 
-lenview = 100  # Camera lens' angle of view in degrees
+observerMode = False # If True, every result will be displayed with pictures.
+showMatchingResult = True  # If True template matching result weill be displayed
+
 im = cv2.imread('sky.jpg')  # This is the current photo of the night sky
-
 picw = im.shape[1]  # Width of picture for mapping
 pich = im.shape[0]  # Height of picture for mapping
 
@@ -14,7 +15,7 @@ pich = im.shape[0]  # Height of picture for mapping
 # Returns with the location of the object
 def GetObjLocation():
     sky_img = cv2.imread('sky.jpg', cv2.IMREAD_UNCHANGED)
-    object_img = cv2.imread('object.JPG', cv2.IMREAD_UNCHANGED)  # object.jpg is the stellar object to track.
+    object_img = cv2.imread('object.jpg', cv2.IMREAD_UNCHANGED)  # object.jpg is the stellar object to track.
 
 
     if observerMode:
@@ -26,54 +27,62 @@ def GetObjLocation():
         cv2.destroyAllWindows()
 
     result = cv2.matchTemplate(sky_img, object_img, cv2.TM_SQDIFF_NORMED)  # TODO: Handling missing result.
+
     if showMatchingResult:
         cv2.imshow('Result', result)
         cv2.waitKey()
         cv2.destroyAllWindows()
 
-    w = object_img.shape[1]
-    h = object_img.shape[0]
-
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
 
+    if (min_val > 1-TRESHHOLD):
+        raise Exception("Matching unsuccesful. Try with another object or lower the treshhold.")
+
     if observerMode:
-        cv2.rectangle(sky_img, min_loc, (min_loc[0] + w, min_loc[1] + h), (0, 255, 255), 2)
+        try:
+            w = object_img.shape[1]
+            h = object_img.shape[0]
 
-        threshold = 0.4
-        t_yloc, t_xloc = np.where(result <= threshold)
+            cv2.rectangle(sky_img, min_loc, (min_loc[0] + w, min_loc[1] + h), (0, 255, 255), 2)
 
-        len(t_yloc)
-        len(t_xloc)
-        rectangles = []
-        for (x, y) in zip(t_xloc, t_yloc):
-            rectangles.append([int(x), int(y), int(w), int(h)])
+            t_yloc, t_xloc = np.where(result <= TRESHHOLD)
+
+            len(t_yloc)
+            len(t_xloc)
+            rectangles = []
+            for (x, y) in zip(t_xloc, t_yloc):
+                rectangles.append([int(x), int(y), int(w), int(h)])
+                rectangles, weights = cv2.groupRectangles(rectangles, 1, 0.2)
+
             rectangles, weights = cv2.groupRectangles(rectangles, 1, 0.2)
 
-        rectangles, weights = cv2.groupRectangles(rectangles, 1, 0.2)
+            for (x, y, w, h) in rectangles:
+                cv2.rectangle(sky_img, (x, y), (x + w, y + h), (0, 255, 255), 2)
 
-        for (x, y, w, h) in rectangles:
-            cv2.rectangle(sky_img, (x, y), (x + w, y + h), (0, 255, 255), 2)
-
-        cv2.imshow('Rectangles', sky_img)
-        cv2.waitKey()
-        cv2.destroyAllWindows()
+            cv2.imshow('Rectangles', sky_img)
+            cv2.waitKey()
+            cv2.destroyAllWindows()
+        except:
+            print("An error occured while trying to display results.")
 
     return min_loc
 
 
-# Returns with movement scale. By knowing the field of view (FOV) of the camera (lenview) a pixels value can be
+# Returns with movement scale. By knowing the field of view (FOV) of the camera (LENVIEW) a pixels value can be
 # transformed to degrees as scale.
 def GetMovementScale():
-    t_xscale = lenview / picw  # 1 unit of picture width = t_xscale degrees
-    t_yscale = lenview / pich  # 1 unit of picture height = t_yscale degrees
+    if (picw != null & picw > 0 & pich != null & pich > 0):
+        t_xscale = LENVIEW / picw  # 1 unit of picture width = t_xscale degrees
+        t_yscale = LENVIEW / pich  # 1 unit of picture height = t_yscale degrees
 
     return t_xscale, t_yscale
 
 
 # Returns the Manhattan distance of the location of the object from focus point of the lens (screen)
 def GetManhattanDistance(t_xloc, t_yloc):
-    t_xdist = t_xloc - picw / 2
-    t_ydist = pich / 2 - t_yloc
+    if (t_xloc != null & t_yloc != null):
+        t_xdist = t_xloc - picw / 2
+        t_ydist = pich / 2 - t_yloc
 
     return t_xdist, t_ydist
 
